@@ -21,7 +21,11 @@ npm start              # Server auf http://127.0.0.1:8080  (Testdaten: /?mock=1)
 npm test               # Unit-Tests (node:test), kein Netz nötig
 npm run test:e2e       # Browser-Test mit Testdaten, legt Screenshots in tests/e2e/screenshots/ ab
 npm run test:all       # beides
+npm run test:live      # gegen echtes brouter.de (braucht Internet, läuft in GitHub Actions)
 ```
+
+Rennrad-Profil: unbefestigte Wege sind **gesperrt** (100000), nicht nur teuer. Sonst rasten Wegpunkte
+auf Waldwegen ein und erzwingen Abstecher. Der Live-Test prüft echte Strecken auf unbefestigte Meter.
 
 ## Arbeitsweise bei neuen Anfragen
 

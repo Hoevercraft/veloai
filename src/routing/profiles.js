@@ -53,7 +53,10 @@ assign accesspenalty =
 `;
 
 export const PROFILES = {
-  road: `# veloai Rennrad – strikt asphaltiert
+  // Rennrad: unbefestigte Wege sind GESPERRT (nicht nur teuer). Grund: BRouter
+  // rastet Wegpunkte auf den nächsten erlaubten Weg ein. Wäre ein Waldweg nur
+  // teuer, landet ein Wegpunkt dort und erzwingt einen Abstecher.
+  road: `# veloai Rennrad – nur befestigte Wege
 ---context:global
 assign validForBikes = true
 
@@ -61,16 +64,19 @@ assign validForBikes = true
 assign turncost = 120
 
 assign ispaved   = surface=asphalt|paved|concrete|paving_stones
-assign isunpaved = surface=unpaved|gravel|fine_gravel|compacted|ground|dirt|earth|sand|grass|mud|cobblestone|sett|pebblestone
+assign isunpaved = surface=unpaved|gravel|fine_gravel|compacted|ground|dirt|earth|sand|grass|mud|pebblestone
+assign pavedtrack = or ispaved tracktype=grade1
 ${ONEWAY_AND_ACCESS(8)}
 assign basecost =
   if highway= then 100000
   else if highway=motorway|motorway_link|trunk|trunk_link then 100000
   else if highway=steps|construction then 100000
-  else if highway=footway|pedestrian|bridleway then 40
-  else if highway=path then ( if ispaved then 2 else 60 )
-  else if highway=track then ( if ispaved then 2.5 else 60 )
-  else if isunpaved then 60
+  else if isunpaved then 100000
+  else if highway=bridleway then 100000
+  else if highway=footway|pedestrian then ( if ispaved then 40 else 100000 )
+  else if highway=path then ( if ispaved then 2 else 100000 )
+  else if highway=track then ( if pavedtrack then 2.5 else 100000 )
+  else if surface=cobblestone|sett then 15
   else if smoothness=bad|very_bad|horrible|very_horrible|impassable then 40
   else if highway=cycleway then 1
   else if highway=tertiary|tertiary_link then 1

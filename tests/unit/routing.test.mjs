@@ -6,6 +6,7 @@ import { analyzeSurface, parseMessages, pavedClass, surfacePieces, breakdownFrom
 import { distanceScore, surfaceScore, overlapShare, directionScore, scoreRoute } from '../../src/routing/scoring.js';
 import { removeBacktracks } from '../../src/routing/backtrack.js';
 import { planRoundTrip } from '../../src/routing/planner.js';
+import { PROFILES } from '../../src/routing/profiles.js';
 import { createMockRouting, createMockPois } from '../../src/services/mock.js';
 
 const START = [9.732, 52.376];
@@ -95,6 +96,14 @@ test('Planer: Belag-Abschnitte decken die angezeigte Route vollständig ab', asy
     assert.ok(Math.abs(sum - r.actualKm) < 0.01, `${sum} vs ${r.actualKm}`);
     for (const p of r.pieces) assert.ok(p.from >= 0 && p.to < r.coords.length && p.from <= p.to);
   }
+});
+
+test('Rennrad-Profil sperrt unbefestigte Wege statt sie nur teurer zu machen', () => {
+  const road = PROFILES.road;
+  assert.match(road, /else if isunpaved then 100000/);
+  assert.match(road, /highway=track then \( if pavedtrack then 2\.5 else 100000 \)/);
+  assert.match(road, /highway=path then \( if ispaved then 2 else 100000 \)/);
+  assert.doesNotMatch(road, /else 60/);
 });
 
 test('distanceScore ist bei Treffer maximal', () => {
