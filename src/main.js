@@ -289,16 +289,12 @@ $('panelToggle').addEventListener('click', () => setPanelCollapsed(!document.bod
 // ── Startzustand herstellen ──
 $('mockBadge').hidden = !services.mock;
 $('version').textContent = `Version ${VERSION} vom ${RELEASED.split('-').reverse().join('.')}`;
-// Prüfen, ob online schon eine neuere Version liegt (Browser-Cache hält Dateien bis zu 10 min)
-fetch(`src/version.js?t=${Date.now()}`, { cache: 'no-store' })
-  .then((r) => (r.ok ? r.text() : ''))
-  .then((txt) => {
-    const online = /VERSION\s*=\s*'([^']+)'/.exec(txt)?.[1];
-    if (online && online !== VERSION) {
-      $('version').textContent += `, online ist schon ${online}: Seite in ein paar Minuten neu laden`;
-    }
-  })
-  .catch(() => {});
+
+// Service Worker: holt App-Dateien online immer frisch (kein veralteter Browser-Cache),
+// offline dient der letzte Stand als Rückfall.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service Worker nicht registriert:', e.message));
+}
 setBike(state.bike);
 setDist(state.distKm);
 compass.set(state.heading, false);
