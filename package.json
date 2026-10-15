@@ -1,6 +1,6 @@
 {
   "name": "veloai",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Rundkurs-Planer für Rennrad, Gravel und Hardcore-Gravel mit belagbewusstem Routing",
   "type": "module",

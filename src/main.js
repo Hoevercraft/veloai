@@ -5,6 +5,7 @@ import { renderElevation, renderSurface, renderScores, buildGpx, attachAutocompl
 import { createServices } from './services/index.js';
 import { planRoundTrip } from './routing/planner.js';
 import { BIKES } from './routing/profiles.js';
+import { VERSION, RELEASED } from './version.js';
 
 // Einstiegspunkt: verbindet Zustand, Dienste, Karte und Bedienpanel.
 
@@ -270,6 +271,17 @@ $('panelToggle').addEventListener('click', () => setPanelCollapsed(!document.bod
 
 // ── Startzustand herstellen ──
 $('mockBadge').hidden = !services.mock;
+$('version').textContent = `Version ${VERSION} vom ${RELEASED.split('-').reverse().join('.')}`;
+// Prüfen, ob online schon eine neuere Version liegt (Browser-Cache hält Dateien bis zu 10 min)
+fetch(`src/version.js?t=${Date.now()}`, { cache: 'no-store' })
+  .then((r) => (r.ok ? r.text() : ''))
+  .then((txt) => {
+    const online = /VERSION\s*=\s*'([^']+)'/.exec(txt)?.[1];
+    if (online && online !== VERSION) {
+      $('version').textContent += `, online ist schon ${online}: Seite in ein paar Minuten neu laden`;
+    }
+  })
+  .catch(() => {});
 setBike(state.bike);
 setDist(state.distKm);
 compass.set(state.heading, false);

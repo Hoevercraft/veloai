@@ -59,6 +59,13 @@ try {
     assert.deepEqual(errors, []);
   });
 
+  await step('Versionsnummer wird unten im Panel angezeigt', async () => {
+    const { VERSION } = await import('../../src/version.js');
+    await page.waitForTimeout(200); // Online-Abgleich abwarten
+    const txt = await t('version').textContent();
+    assert.match(txt, new RegExp(`^Version ${VERSION.replace(/\./g, '\\.')} vom \\d{2}\\.\\d{2}\\.\\d{4}$`));
+  });
+
   await step('Planen ohne Start zeigt eine Anleitung', async () => {
     await t('plan-button').click();
     await t('plan-error').waitFor({ state: 'visible' });
