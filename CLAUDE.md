@@ -30,6 +30,8 @@ npm run test:all       # beides
 3. E2E-Test um einen Schritt für das neue Verhalten erweitern.
 4. `npm run test:all` muss grün sein. Screenshots ansehen und selbst beurteilen, ob das Ergebnis die Anfrage erfüllt.
 5. Arbeit auf einem eigenen Branch, Pull Request mit Kriterien, Testergebnis und Screenshots.
+6. **Version erhöhen** in `src/version.js` (VERSION + RELEASED) und `package.json` – ein Unit-Test prüft,
+   dass beide übereinstimmen. Die Nummer steht unten im Panel, damit Jan sieht, ob die Seite aktuell ist.
 
 ## Architektur
 

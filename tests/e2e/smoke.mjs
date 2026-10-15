@@ -21,6 +21,22 @@ async function step(name, fn) {
   catch (e) { results.push(['FEHLER', name, e.message]); }
 }
 
+// Die gezeichnete Route (SVG) muss auf dem Bildschirm am Startmarker beginnen.
+// Fängt den Fehler ab, bei dem Polylinien während einer Zoom-Animation versetzt landen.
+async function assertRouteAtStart(page) {
+  const r = await page.evaluate(() => {
+    const pin = document.querySelector('.start-pin').getBoundingClientRect();
+    const paths = [...document.querySelectorAll('.leaflet-overlay-pane path')];
+    const boxes = paths.map((p) => p.getBoundingClientRect());
+    const minX = Math.min(...boxes.map((b) => b.left)), maxX = Math.max(...boxes.map((b) => b.right));
+    const minY = Math.min(...boxes.map((b) => b.top)), maxY = Math.max(...boxes.map((b) => b.bottom));
+    return { cx: pin.left + pin.width / 2, cy: pin.top + pin.height / 2, minX, maxX, minY, maxY };
+  });
+  const tol = 8;
+  assert.ok(r.cx >= r.minX - tol && r.cx <= r.maxX + tol && r.cy >= r.minY - tol && r.cy <= r.maxY + tol,
+    `Startmarker (${r.cx.toFixed(0)},${r.cy.toFixed(0)}) liegt außerhalb der Route [${r.minX.toFixed(0)}–${r.maxX.toFixed(0)}, ${r.minY.toFixed(0)}–${r.maxY.toFixed(0)}]`);
+}
+
 async function newPage(viewport) {
   const page = await browser.newPage({ viewport, acceptDownloads: true });
   const errors = [];
@@ -41,6 +57,13 @@ try {
   await step('Seite lädt ohne JavaScript-Fehler, Testdaten-Hinweis sichtbar', async () => {
     await t('mock-badge').waitFor({ state: 'visible' });
     assert.deepEqual(errors, []);
+  });
+
+  await step('Versionsnummer wird unten im Panel angezeigt', async () => {
+    const { VERSION } = await import('../../src/version.js');
+    await page.waitForTimeout(200); // Online-Abgleich abwarten
+    const txt = await t('version').textContent();
+    assert.match(txt, new RegExp(`^Version ${VERSION.replace(/\./g, '\\.')} vom \\d{2}\\.\\d{2}\\.\\d{4}$`));
   });
 
   await step('Planen ohne Start zeigt eine Anleitung', async () => {
@@ -100,7 +123,19 @@ try {
   await step('Belag-Ansicht umschalten', async () => {
     await t('style-surface').click();
     assert.equal(await t('style-surface').getAttribute('aria-pressed'), 'true');
+    await assertRouteAtStart(page);
     await page.screenshot({ path: SHOTS + 'desktop-surface.png' });
+  });
+
+  await step('Desktop: Panel einklappen lässt nur die Kopfzeile stehen', async () => {
+    await t('panel-toggle').click();
+    const h = (await page.locator('.panel').boundingBox()).height;
+    assert.ok(h < 120, `Panelhöhe ${h}`);
+    assert.match(await t('brand-sub').textContent(), /km/);
+    await assertRouteAtStart(page);
+    await page.screenshot({ path: SHOTS + 'desktop-collapsed.png' });
+    await t('panel-toggle').click();
+    await t('gpx-button').waitFor({ state: 'visible' });
   });
 
   await step('GPX-Download enthält Trackpunkte', async () => {
@@ -133,6 +168,24 @@ try {
     await m.screenshot({ path: SHOTS + 'mobile-top.png' });
     await m.getByTestId('results').scrollIntoViewIfNeeded();
     await m.screenshot({ path: SHOTS + 'mobile-results.png' });
+    assert.deepEqual(mobile.errors, []);
+  });
+
+  await step('Mobil: Panel einklappen gibt der Karte fast den ganzen Bildschirm', async () => {
+    const m = mobile.page;
+    await m.getByTestId('panel-toggle').click();
+    assert.equal(await m.getByTestId('panel-toggle').getAttribute('aria-expanded'), 'false');
+    const mapH = (await m.getByTestId('map').boundingBox()).height;
+    assert.ok(mapH > 844 * 0.85, `Kartenhöhe ${mapH}`);
+    assert.ok(!(await m.getByTestId('plan-button').isVisible()));
+    assert.match(await m.getByTestId('brand-sub').textContent(), /km, \d+ Hm/);
+    // Leaflet muss die neue Größe kennen: Kacheln/Route füllen die ganze Fläche
+    const size = await m.evaluate(() => document.querySelector('.leaflet-container').clientHeight);
+    assert.ok(size > 844 * 0.85);
+    await assertRouteAtStart(m);
+    await m.screenshot({ path: SHOTS + 'mobile-collapsed.png' });
+    await m.getByTestId('panel-toggle').click();
+    await m.getByTestId('plan-button').waitFor({ state: 'visible' });
     assert.deepEqual(mobile.errors, []);
   });
 } finally {

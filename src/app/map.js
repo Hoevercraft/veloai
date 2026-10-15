@@ -92,7 +92,22 @@ export function createMap(container, { onPickStart }) {
     } else {
       L.polyline(lls, { color, weight: 5, lineCap: 'round', lineJoin: 'round' }).addTo(routeLayer);
     }
-    if (fit) map.fitBounds(L.latLngBounds(lls), { padding: [40, 40], paddingTopLeft: window.innerWidth > 760 ? [420, 40] : [30, 30] });
+    lastBounds = L.latLngBounds(lls);
+    if (fit) fitRoute();
+  }
+
+  // Ohne Animation: Polylinien, die während einer laufenden Zoom-Animation
+  // gezeichnet werden, landen sonst versetzt zu den Markern.
+  let lastBounds = null;
+  function fitRoute() {
+    if (!lastBounds) return;
+    const desktop = window.innerWidth > 760;
+    const collapsed = document.body.classList.contains('panel-collapsed');
+    map.fitBounds(lastBounds, {
+      animate: false,
+      paddingTopLeft: desktop ? [collapsed ? 40 : 420, collapsed ? 110 : 40] : [24, 24],
+      paddingBottomRight: [40, 40],
+    });
   }
 
   function showHover(coord, color) {
@@ -104,5 +119,12 @@ export function createMap(container, { onPickStart }) {
     if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
   }
 
-  return { map, setTile, setStart, setHeading, setVias, showRoute, showHover, clearHover };
+  // Nach Größenänderung des Kartencontainers (Panel ein-/ausklappen) neu vermessen,
+  // Kartenmitte dabei beibehalten
+  function resize({ refit = false } = {}) {
+    map.invalidateSize({ pan: false });
+    if (refit) fitRoute();
+  }
+
+  return { map, resize, fitRoute, setTile, setStart, setHeading, setVias, showRoute, showHover, clearHover };
 }
