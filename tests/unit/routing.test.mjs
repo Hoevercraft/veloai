@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { distKm, bearing, angleDiff, lineKm } from '../../src/core/geo.js';
 import { generateLayouts, waypointCount, mergeVias, minLoopKmThroughVias } from '../../src/routing/loopgen.js';
-import { analyzeSurface, parseMessages, pavedClass } from '../../src/routing/surface.js';
+import { analyzeSurface, parseMessages, pavedClass, surfacePieces, breakdownFromPieces } from '../../src/routing/surface.js';
 import { distanceScore, surfaceScore, overlapShare, directionScore, scoreRoute } from '../../src/routing/scoring.js';
 import { removeBacktracks } from '../../src/routing/backtrack.js';
 import { planRoundTrip } from '../../src/routing/planner.js';
@@ -73,6 +73,28 @@ test('pavedClass: ungetaggter Feldweg gilt als unbefestigt, grade1 als befestigt
   assert.equal(pavedClass({ highway: 'track' }), 'unpaved');
   assert.equal(pavedClass({ highway: 'track', tracktype: 'grade1' }), 'paved');
   assert.equal(pavedClass({ highway: 'residential' }), 'paved');
+});
+
+test('surfacePieces: Länge, Mittelpunkt und auch winzige Abschnitte', () => {
+  const coords = [[10, 52], [10.01, 52], [10.02, 52], [10.02005, 52], [10.03, 52]];
+  const segs = [{ from: 0, to: 2, key: 'asphalt' }, { from: 2, to: 3, key: 'grass' }, { from: 3, to: 4, key: 'asphalt' }];
+  const pieces = surfacePieces(coords, segs);
+  assert.equal(pieces.length, 3);
+  assert.ok(Math.abs(pieces[0].km - (distKm(coords[0], coords[1]) + distKm(coords[1], coords[2]))) < 1e-9);
+  assert.ok(pieces[1].km > 0 && pieces[1].km < 0.005, `Grasstück ${pieces[1].km}`);
+  assert.deepEqual(pieces[1].mid, [10.02005, 52]);
+  const bd = breakdownFromPieces(pieces);
+  assert.deepEqual(Object.keys(bd).sort(), ['asphalt', 'grass']);
+  assert.ok(Math.abs(bd.asphalt + bd.grass - lineKm(coords)) < 1e-9);
+});
+
+test('Planer: Belag-Abschnitte decken die angezeigte Route vollständig ab', async () => {
+  const res = await planRoundTrip({ start: START, distKm: 40, bike: 'gravel', seed: 4 }, mockServices);
+  for (const r of res.routes) {
+    const sum = Object.values(r.breakdown).reduce((a, b) => a + b, 0);
+    assert.ok(Math.abs(sum - r.actualKm) < 0.01, `${sum} vs ${r.actualKm}`);
+    for (const p of r.pieces) assert.ok(p.from >= 0 && p.to < r.coords.length && p.from <= p.to);
+  }
 });
 
 test('distanceScore ist bei Treffer maximal', () => {

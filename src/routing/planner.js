@@ -1,6 +1,6 @@
 import { distKm, bearing, destination, lineKm } from '../core/geo.js';
 import { generateLayouts, snapToCandidates, mergeVias, minLoopKmThroughVias } from './loopgen.js';
-import { parseMessages, analyzeSurface, surfaceKeyMap, surfaceSegments } from './surface.js';
+import { parseMessages, analyzeSurface, surfaceKeyMap, surfaceSegments, surfacePieces, breakdownFromPieces } from './surface.js';
 import { removeBacktracks } from './backtrack.js';
 import { scoreRoute } from './scoring.js';
 import { mapLimit } from '../services/http.js';
@@ -85,6 +85,7 @@ export async function planRoundTrip(params, services, onProgress = () => {}, opt
     const actualKm = lineKm(coords);
     const surface = analyzeSurface(rows, bike);
     const { segs, riskSegs } = surfaceSegments(coords, keyMap);
+    const pieces = surfacePieces(coords, segs);
     const score = scoreRoute({ coords, actualKm, targetKm: target, surface, bike, heading });
     return {
       id: layout.id,
@@ -97,6 +98,8 @@ export async function planRoundTrip(params, services, onProgress = () => {}, opt
       surface,
       segs,
       riskSegs,
+      pieces,
+      breakdown: breakdownFromPieces(pieces), // km je Belag auf der angezeigten Route
       score,
     };
   };

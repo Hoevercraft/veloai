@@ -12,6 +12,8 @@ const TAGS = {
   hardcore: ['highway=track surface=gravel', 'highway=track surface=ground', 'highway=path surface=dirt', 'highway=track surface=fine_gravel', 'highway=track tracktype=grade3'],
 };
 
+const SEG_KM = [0.8, 1.6, 0.6, 2.2, 1.1];
+
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function createMockRouting({ latencyMs = 120 } = {}) {
@@ -37,9 +39,12 @@ export function createMockRouting({ latencyMs = 120 } = {}) {
           segKm += d; total += d;
         }
         coords.push(pt);
-        if (segKm >= 0.6 || (i === points.length - 1 && s === steps)) {
+        // Abschnittslängen variieren; jedes fünfte Stück ist ein kurzer Grasweg (~60 m)
+        const short = segIdx % 5 === 2;
+        if (segKm >= (short ? 0.05 : SEG_KM[segIdx % SEG_KM.length]) || (i === points.length - 1 && s === steps)) {
+          const tag = short ? 'highway=path surface=grass' : tags[segIdx % tags.length];
           messages.push([String(Math.round(pt[0] * 1e6)), String(Math.round(pt[1] * 1e6)), String(Math.round(ele)),
-            String(Math.round(segKm * 1000)), '1000', '0', '0', '0', '0', tags[segIdx % tags.length], '', '0', '0']);
+            String(Math.round(segKm * 1000)), '1000', '0', '0', '0', '0', tag, '', '0', '0']);
           segKm = 0; segIdx++;
         }
       }

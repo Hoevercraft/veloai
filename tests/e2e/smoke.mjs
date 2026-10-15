@@ -127,6 +127,36 @@ try {
     await page.screenshot({ path: SHOTS + 'desktop-surface.png' });
   });
 
+  await step('Belag antippen markiert alle Abschnitte, nochmal antippen blendet aus', async () => {
+    const items = t('surface-list').locator('button[data-key]');
+    const last = t('surface-item-grass'); // Testdaten: kurze Grasstücke von ~60 m
+    const key = 'grass';
+    const expected = await page.evaluate((k) => {
+      const s = window.veloai.state;
+      return s.plan.routes[s.index].pieces.filter((p) => p.key === k && p.km < 0.5).length;
+    }, key);
+    assert.ok(expected > 0, 'Testdaten sollten kurze Grasstücke enthalten');
+    await last.click();
+    assert.equal(await last.getAttribute('aria-pressed'), 'true');
+    // dicke Hervorhebungslinien liegen auf der Karte
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('.leaflet-overlay-pane path')].some((p) => p.getAttribute('stroke-width') === '8')));
+    assert.equal(await page.locator('.surface-marker').count(), expected);
+    // zweiter Belag dazu → beide sichtbar
+    const first = items.first();
+    const key2 = await first.getAttribute('data-key');
+    const expected2 = await page.evaluate((k) => {
+      const s = window.veloai.state;
+      return s.plan.routes[s.index].pieces.filter((p) => p.key === k && p.km < 0.5).length;
+    }, key2);
+    await first.click();
+    assert.equal(await page.locator('.surface-marker').count(), expected + expected2);
+    await page.screenshot({ path: SHOTS + 'desktop-surface-highlight.png' });
+    await first.click();
+    await last.click();
+    assert.equal(await last.getAttribute('aria-pressed'), 'false');
+    assert.equal(await page.locator('.surface-marker').count(), 0);
+  });
+
   await step('Desktop: Panel einklappen lässt nur die Kopfzeile stehen', async () => {
     await t('panel-toggle').click();
     const h = (await page.locator('.panel').boundingBox()).height;
