@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>veloai – Rundkurse für Rennrad und Gravel</title>
+  <meta name="description" content="Rundkurs-Planer mit Belagkontrolle: Rennrad nur auf Asphalt, Hardcore-Gravel abseits der Straße.">
+  <meta name="theme-color" content="#eef1ec">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Condensed:wght@500;600&display=swap">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="src/main.js"></script>
+</head>
+<body data-bike="gravel">
+<div class="app">
+  <div id="map" data-testid="map" aria-label="Karte"></div>
+
+  <div class="map-ctl">
+    <div class="seg" role="group" aria-label="Kartenart">
+      <button type="button" data-tile="osm" aria-pressed="true" data-testid="tile-osm">Karte</button>
+      <button type="button" data-tile="topo" aria-pressed="false" data-testid="tile-topo">Topo</button>
+    </div>
+    <div class="seg" id="styleSeg" role="group" aria-label="Routenfarbe" hidden>
+      <button type="button" data-style="plain" aria-pressed="true" data-testid="style-plain">Einfarbig</button>
+      <button type="button" data-style="surface" aria-pressed="false" data-testid="style-surface">Belag</button>
+    </div>
+  </div>
+  <p class="map-hint" id="mapHint" data-testid="map-hint">Tippe auf die Karte, um den Start zu setzen</p>
+
+  <aside class="panel" aria-label="Routenplanung">
+    <header class="brand">
+      <h1 class="brand-name">velo<span>ai</span></h1>
+      <span class="brand-sub">Rundkurse mit dem richtigen Belag</span>
+      <span class="badge-mock" id="mockBadge" data-testid="mock-badge" hidden>Testdaten</span>
+    </header>
+
+    <div class="panel-scroll">
+      <section class="section">
+        <h2>Start</h2>
+        <div class="field">
+          <input class="input" id="startInput" data-testid="start-input" type="search" autocomplete="off"
+                 placeholder="Ort oder Adresse" aria-label="Startpunkt suchen">
+          <button class="icon-btn" id="gpsBtn" type="button" data-testid="start-gps" aria-label="Meinen Standort verwenden" title="Meinen Standort verwenden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+          </button>
+          <div class="suggest" id="startSuggest" role="listbox" data-testid="start-suggest" hidden></div>
+        </div>
+        <p class="start-name" id="startName" data-testid="start-name" hidden></p>
+        <p class="msg err" id="startErr" data-testid="start-error" hidden></p>
+      </section>
+
+      <section class="section">
+        <h2>Fahrrad</h2>
+        <div class="bikes" role="group" aria-label="Fahrradtyp">
+          <button type="button" class="bike" data-bike="road" data-testid="bike-road" aria-pressed="false"><strong>Rennrad</strong><span>Nur Asphalt</span></button>
+          <button type="button" class="bike" data-bike="gravel" data-testid="bike-gravel" aria-pressed="true"><strong>Gravel</strong><span>Wege und Nebenstraßen</span></button>
+          <button type="button" class="bike" data-bike="hardcore" data-testid="bike-hardcore" aria-pressed="false"><strong>Hardcore</strong><span>Kein Asphalt, wo es geht</span></button>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Länge</h2>
+        <div class="dist-row"><span class="dist-num" id="distNum" data-testid="distance-value">50</span><span class="dist-unit">km Rundkurs</span></div>
+        <input type="range" id="distSlider" data-testid="distance-slider" min="10" max="200" step="5" value="50" aria-label="Zieldistanz in Kilometern">
+        <div class="ticks" aria-hidden="true"><span>10</span><span>50</span><span>100</span><span>150</span><span>200</span></div>
+      </section>
+
+      <section class="section">
+        <h2>Startrichtung <small>optional</small></h2>
+        <div class="compass-wrap">
+          <svg class="compass" id="compass" data-testid="compass" viewBox="-100 -100 200 200" role="slider"
+               aria-label="Startrichtung" aria-valuemin="0" aria-valuemax="345" tabindex="0" data-off="true"></svg>
+          <div class="compass-info">
+            <strong id="headingLabel" data-testid="heading-label">Egal</strong>
+            <p id="headingHint">Ziehe die Nadel oder tippe eine Richtung an.</p>
+            <div class="chips">
+              <button type="button" class="chip" id="headingClear" data-testid="compass-clear" aria-pressed="true">Egal</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>Zwischenziele <small>optional, bis zu 3</small></h2>
+        <div id="viaList" data-testid="via-list"></div>
+        <button type="button" class="link-btn" id="viaAdd" data-testid="via-add">+ Zwischenziel hinzufügen</button>
+        <p class="msg err" id="viaErr" data-testid="via-error" hidden></p>
+      </section>
+
+      <section class="section">
+        <h2>Optionen</h2>
+        <div class="opt">
+          <div class="opt-text"><strong>Heißer Tag</strong><span>Bevorzugt Wald und Parks</span></div>
+          <label class="switch"><input type="checkbox" id="hotToggle" data-testid="hot-toggle"><span></span><b class="sr-only">Heißer Tag</b></label>
+        </div>
+        <div class="opt">
+          <div class="opt-text"><strong>Dein Schnitt</strong><span>Für die Zeitschätzung, leer = automatisch</span></div>
+          <input class="input speed" id="speedInput" data-testid="speed-input" type="number" min="5" max="60" step="1" placeholder="auto" aria-label="Durchschnittsgeschwindigkeit in km/h">
+        </div>
+      </section>
+
+      <section class="section">
+        <button type="button" class="plan-btn" id="planBtn" data-testid="plan-button">
+          <span class="spinner" id="spinner" hidden></span><span id="planLabel">Route planen</span>
+        </button>
+        <p class="status" id="status" data-testid="status" aria-live="polite"></p>
+        <p class="msg err" id="planErr" data-testid="plan-error" hidden></p>
+        <p class="msg note" id="planNote" data-testid="plan-note" hidden></p>
+      </section>
+
+      <section class="section results" id="results" data-testid="results" hidden>
+        <div class="variant">
+          <button class="icon-btn" id="prevVariant" type="button" data-testid="variant-prev" aria-label="Vorherige Variante">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+          </button>
+          <div class="variant-label"><strong id="variantLabel" data-testid="variant-label">Variante 1 von 1</strong><span id="variantScore" data-testid="variant-score"></span></div>
+          <button class="icon-btn" id="nextVariant" type="button" data-testid="variant-next" aria-label="Nächste Variante">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+        <div class="stats">
+          <div class="stat"><b id="statDist" data-testid="stat-distance">–</b><span>Distanz</span></div>
+          <div class="stat"><b id="statAsc" data-testid="stat-ascent">–</b><span>Höhenmeter</span></div>
+          <div class="stat"><b id="statTime" data-testid="stat-time">–</b><span>Fahrzeit</span></div>
+        </div>
+        <p class="msg note" id="surfWarn" data-testid="surface-warning" hidden></p>
+        <div class="scores" id="scores" data-testid="scores"></div>
+
+        <h3 class="sub-h">Höhenprofil <span id="elevInfo" data-testid="elevation-info"></span></h3>
+        <div class="elev" id="elev" data-testid="elevation"></div>
+
+        <h3 class="sub-h">Untergrund</h3>
+        <div class="surf-bar" id="surfBar"></div>
+        <ul class="surf-list" id="surfList" data-testid="surface-list"></ul>
+
+        <div class="actions">
+          <button type="button" class="btn primary" id="gpxBtn" data-testid="gpx-button">GPX herunterladen</button>
+          <button type="button" class="btn" id="rerollBtn" data-testid="reroll-button">Neue Vorschläge</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

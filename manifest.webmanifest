@@ -1,0 +1,9 @@
+{
+  "name": "veloai – Rundkurse mit dem richtigen Belag",
+  "short_name": "veloai",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#eef1ec",
+  "theme_color": "#eef1ec",
+  "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
