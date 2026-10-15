@@ -51,7 +51,18 @@ button { cursor: pointer; }
 .brand-name { font: 600 28px/1 var(--font-cond); letter-spacing: .5px; margin: 0; }
 .brand-name span { color: var(--accent); transition: color .2s; }
 .brand-sub { color: var(--ink-3); font-size: 13px; }
-.badge-mock { margin-left: auto; font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #fbe9c8; color: #7a4b07; }
+.badge-mock { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #fbe9c8; color: #7a4b07; }
+.brand { align-items: center; }
+.brand-sub { flex: 1; min-width: 0; }
+.panel-toggle { width: 36px; height: 36px; margin-left: auto; }
+.panel-toggle svg { transition: transform .2s; }
+
+/* Eingeklappt: nur die Kopfzeile bleibt, die Karte bekommt den Platz */
+body.panel-collapsed .panel { bottom: auto; }
+body.panel-collapsed .panel-scroll { display: none; }
+body.panel-collapsed .brand { border-bottom: 0; }
+body.panel-collapsed .panel-toggle svg { transform: rotate(180deg); }
+body.panel-collapsed .brand-sub { color: var(--ink); font-weight: 600; }
 
 .section { padding: 14px 0; border-bottom: 1px solid var(--line); }
 .section:last-child { border-bottom: 0; }
@@ -223,6 +234,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 10px 0 0
   .panel-scroll { padding: 6px 16px 24px; }
   .map-ctl { top: 10px; right: 10px; }
   .map-hint { bottom: auto; top: calc(46dvh - 52px); transform: translateX(-50%); }
+  .panel-toggle svg { transform: rotate(180deg); }
+  body.panel-collapsed .panel-toggle svg { transform: none; }
+  body.panel-collapsed #map { height: auto; flex: 1; }
+  body.panel-collapsed .panel { flex: none; }
+  body.panel-collapsed .map-hint { top: auto; bottom: 20px; }
   .compass-wrap { grid-template-columns: 148px 1fr; }
   .compass { width: 148px; height: 148px; }
 }

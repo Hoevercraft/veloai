@@ -195,7 +195,7 @@ async function plan() {
     state.plan = { ...result, bike: state.bike };
     show($('planNote'), result.notes.join(' '));
     showVariant(0);
-    // Nur den Panel-Inhalt scrollen – scrollIntoView würde auch Vorfahren verschieben und die Karte versetzen
+    // Nur den Panel-Inhalt scrollen, nicht die ganze Seite
     const scroller = document.querySelector('.panel-scroll');
     scroller.scrollTo({ top: $('results').offsetTop - scroller.offsetTop - 8, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
     $('status').textContent = `${result.routes.length} Varianten aus ${result.tried} Kandidaten.`;
@@ -231,6 +231,7 @@ function showVariant(i, { fit = true } = {}) {
   renderScores($('scores'), r.score.parts);
   renderElevation($('elev'), $('elevInfo'), r.coords, color, (c) => (c ? map.showHover(c, color) : map.clearHover()));
   renderSurface($('surfBar'), $('surfList'), r.surface.breakdown);
+  updateBrandSub();
 }
 $('prevVariant').addEventListener('click', () => showVariant(state.index - 1));
 $('nextVariant').addEventListener('click', () => showVariant(state.index + 1));
@@ -245,6 +246,27 @@ $('gpxBtn').addEventListener('click', () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 });
+
+// ── Panel ein-/ausklappen ──
+const BRAND_SUB = 'Rundkurse mit dem richtigen Belag';
+function updateBrandSub() {
+  const r = state.plan?.routes[state.index];
+  const collapsed = document.body.classList.contains('panel-collapsed');
+  $('brandSub').textContent = collapsed && r
+    ? `${r.actualKm.toFixed(1).replace('.', ',')} km, ${Math.round(r.ascentM)} Hm`
+    : BRAND_SUB;
+}
+function setPanelCollapsed(collapsed) {
+  document.body.classList.toggle('panel-collapsed', collapsed);
+  const t = $('panelToggle');
+  t.setAttribute('aria-expanded', String(!collapsed));
+  const label = collapsed ? 'Panel ausklappen' : 'Panel einklappen';
+  t.setAttribute('aria-label', label);
+  t.title = label;
+  updateBrandSub();
+  requestAnimationFrame(() => map.resize({ refit: !!state.plan }));
+}
+$('panelToggle').addEventListener('click', () => setPanelCollapsed(!document.body.classList.contains('panel-collapsed')));
 
 // ── Startzustand herstellen ──
 $('mockBadge').hidden = !services.mock;
