@@ -66,6 +66,21 @@ try {
     assert.match(txt, new RegExp(`^Version ${VERSION.replace(/\./g, '\\.')} vom \\d{2}\\.\\d{2}\\.\\d{4}$`));
   });
 
+  await step('Service Worker übernimmt und liefert geänderte Dateien sofort frisch aus', async () => {
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    assert.ok(await page.evaluate(() => !!navigator.serviceWorker.controller), 'Seite wird nicht vom Service Worker gesteuert');
+    // Server liefert eine "neue" Version – die Seite muss sie nach einem Neuladen zeigen,
+    // auch wenn der Browser die alte Datei noch im Cache hat
+    // Server bekommt ein "Update"; der Browser hat die alte Datei mit max-age=600 im Cache
+    server.overrides.set('/src/version.js', "export const VERSION = '9.9.9'; export const RELEASED = '2030-01-01';");
+    await page.reload();
+    await page.waitForFunction(() => document.querySelector('[data-testid=version]')?.textContent, null, { timeout: 5000 });
+    assert.match(await t('version').textContent(), /^Version 9\.9\.9 vom 01\.01\.2030$/);
+    server.overrides.delete('/src/version.js');
+    await page.reload();
+  });
+
   await step('Planen ohne Start zeigt eine Anleitung', async () => {
     await t('plan-button').click();
     await t('plan-error').waitFor({ state: 'visible' });

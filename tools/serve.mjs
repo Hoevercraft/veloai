@@ -1,4 +1,7 @@
 // Minimaler statischer Server für Entwicklung und Tests: node tools/serve.mjs [port]
+// Sendet wie GitHub Pages "Cache-Control: max-age=600", damit Tests das echte
+// Cache-Verhalten sehen. `overrides` (Map Pfad → Inhalt) erlaubt Tests, Dateien
+// zur Laufzeit auszutauschen, z. B. um ein Update zu simulieren.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -11,18 +14,21 @@ const TYPES = {
   '.webmanifest': 'application/manifest+json',
 };
 
-export function serve(port = 8080) {
+export function serve(port = 8080, { overrides = new Map() } = {}) {
   const server = createServer(async (req, res) => {
     const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^(\.\.[/\\])+/, '');
-    const file = join(ROOT, path.endsWith('/') ? path + 'index.html' : path);
+    const rel = path.endsWith('/') ? path + 'index.html' : path;
+    const file = join(ROOT, rel);
     if (!file.startsWith(ROOT)) { res.writeHead(403).end(); return; }
+    const headers = { 'content-type': TYPES[extname(file)] || 'application/octet-stream', 'cache-control': 'max-age=600' };
     try {
-      const body = await readFile(file);
-      res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' }).end(body);
+      const body = overrides.has(rel) ? overrides.get(rel) : await readFile(file);
+      res.writeHead(200, headers).end(body);
     } catch {
       res.writeHead(404).end('Nicht gefunden');
     }
   });
+  server.overrides = overrides;
   return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)));
 }
 
