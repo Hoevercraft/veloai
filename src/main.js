@@ -5,6 +5,7 @@ import { renderElevation, renderSurface, renderScores, buildGpx, attachAutocompl
 import { createServices } from './services/index.js';
 import { planRoundTrip } from './routing/planner.js';
 import { BIKES } from './routing/profiles.js';
+import { SURFACE_LABELS } from './routing/surface.js';
 import { VERSION, RELEASED } from './version.js';
 
 // Einstiegspunkt: verbindet Zustand, Dienste, Karte und Bedienpanel.
@@ -231,8 +232,24 @@ function showVariant(i, { fit = true } = {}) {
   show($('surfWarn'), r.surface.warning || '');
   renderScores($('scores'), r.score.parts);
   renderElevation($('elev'), $('elevInfo'), r.coords, color, (c) => (c ? map.showHover(c, color) : map.clearHover()));
-  renderSurface($('surfBar'), $('surfList'), r.surface.breakdown);
+  // Markierte Beläge bleiben beim Blättern erhalten, sofern die Variante sie enthält
+  for (const k of [...highlighted]) if (!(k in r.breakdown)) highlighted.delete(k);
+  renderSurfaceList();
   updateBrandSub();
+}
+
+// ── Belag auf der Karte markieren (antippen = ein, nochmal = aus) ──
+const highlighted = new Set();
+function renderSurfaceList() {
+  const r = state.plan.routes[state.index];
+  renderSurface($('surfBar'), $('surfList'), r.breakdown, {
+    selected: highlighted,
+    onToggle: (key) => {
+      if (highlighted.has(key)) highlighted.delete(key); else highlighted.add(key);
+      renderSurfaceList();
+    },
+  });
+  map.highlightSurfaces(r, highlighted, (k) => SURFACE_LABELS[k] || k);
 }
 $('prevVariant').addEventListener('click', () => showVariant(state.index - 1));
 $('nextVariant').addEventListener('click', () => showVariant(state.index + 1));

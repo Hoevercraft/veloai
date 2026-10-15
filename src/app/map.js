@@ -110,6 +110,38 @@ export function createMap(container, { onPickStart }) {
     });
   }
 
+  // Markiert alle Abschnitte der gewählten Beläge: dicke Linie + Marker in der
+  // Abschnittsmitte, damit auch wenige Meter lange Stücke auffindbar sind.
+  const highlightLayer = L.layerGroup().addTo(map);
+  const MARKER_MAX_KM = 0.5;
+  function highlightSurfaces(route, keys, labelOf) {
+    highlightLayer.clearLayers();
+    if (!route || !keys.size) return;
+    const lls = route.coords.map((c) => [c[1], c[0]]);
+    const pieces = (route.pieces || []).filter((p) => keys.has(p.key));
+    // Erst alle Linien (Kontur, dann Farbe) …
+    for (const pass of ['casing', 'fill']) {
+      for (const p of pieces) {
+        const part = lls.slice(p.from, p.to + 1);
+        if (part.length < 2) continue;
+        const style = pass === 'casing'
+          ? { color: '#1e2a2b', weight: 13, opacity: 0.9 }
+          : { color: SURFACE_COLORS[p.key] || SURFACE_COLORS.other, weight: 8, opacity: 1 };
+        L.polyline(part, { ...style, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(highlightLayer);
+      }
+    }
+    // … dann die Marker obendrauf, damit sie nie verdeckt werden
+    for (const p of pieces) {
+      const color = SURFACE_COLORS[p.key] || SURFACE_COLORS.other;
+      // Lange Abschnitte sind als Linie gut sichtbar – Marker nur für kurze Stücke
+      if (p.km >= MARKER_MAX_KM) continue;
+      const len = p.km < 0.1 ? `${Math.max(1, Math.round(p.km * 1000))} m` : `${p.km.toFixed(1).replace('.', ',')} km`;
+      L.circleMarker([p.mid[1], p.mid[0]], {
+        radius: 9, weight: 3, color: '#1e2a2b', fillColor: color, fillOpacity: 1, className: 'surface-marker',
+      }).addTo(highlightLayer).bindTooltip(`${labelOf(p.key)}, ${len}`, { direction: 'top', offset: [0, -6] });
+    }
+  }
+
   function showHover(coord, color) {
     const ll = [coord[1], coord[0]];
     if (!hoverMarker) hoverMarker = L.circleMarker(ll, { radius: 7, weight: 3, color: '#fff', fillColor: color, fillOpacity: 1 }).addTo(map);
@@ -126,5 +158,5 @@ export function createMap(container, { onPickStart }) {
     if (refit) fitRoute();
   }
 
-  return { map, resize, fitRoute, setTile, setStart, setHeading, setVias, showRoute, showHover, clearHover };
+  return { map, resize, fitRoute, highlightSurfaces, setTile, setStart, setHeading, setVias, showRoute, showHover, clearHover };
 }

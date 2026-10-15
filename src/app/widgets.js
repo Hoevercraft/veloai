@@ -58,8 +58,13 @@ export function renderElevation(container, infoEl, coords, color, onHover) {
   container.onpointercancel = leave;
 }
 
-export function renderSurface(barEl, listEl, breakdown) {
-  const entries = Object.entries(breakdown || {}).filter(([, km]) => km > 0.01).sort((a, b) => b[1] - a[1]);
+/**
+ * Belag-Balken + Liste. Jeder Eintrag ist ein Schalter: antippen markiert
+ * alle Abschnitte dieses Belags auf der Karte, nochmal antippen blendet aus.
+ */
+export function renderSurface(barEl, listEl, breakdown, { selected = new Set(), onToggle = () => {} } = {}) {
+  // Auch winzige Abschnitte aufführen – nur exakt 0 km ohne Abschnitt fällt weg
+  const entries = Object.entries(breakdown || {}).filter(([, km]) => km >= 0).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((s, [, km]) => s + km, 0);
   if (!total) {
     barEl.innerHTML = '';
@@ -68,10 +73,18 @@ export function renderSurface(barEl, listEl, breakdown) {
   }
   barEl.innerHTML = entries.map(([k, km]) =>
     `<i style="width:${(km / total * 100).toFixed(1)}%;background:${SURFACE_COLORS[k] || SURFACE_COLORS.other}" title="${esc(SURFACE_LABELS[k] || k)}"></i>`).join('');
+  const fmtKm = (km) => (km < 0.1 ? `${Math.max(1, Math.round(km * 1000))} m` : `${km.toFixed(1).replace('.', ',')} km`);
+  const fmtPct = (km) => { const p = km / total * 100; return p > 0 && p < 1 ? '<1 %' : `${Math.round(p)} %`; };
   listEl.innerHTML = entries.map(([k, km]) => `
-    <li><i style="background:${SURFACE_COLORS[k] || SURFACE_COLORS.other}"></i>
+    <li><button type="button" class="surf-item" data-key="${esc(k)}" data-testid="surface-item-${esc(k)}"
+        aria-pressed="${selected.has(k)}" title="Auf der Karte markieren">
+      <i style="background:${SURFACE_COLORS[k] || SURFACE_COLORS.other}"></i>
       <span class="name">${esc(SURFACE_LABELS[k] || k)}</span>
-      <span class="val">${Math.round(km / total * 100)} %, ${km.toFixed(1)} km</span></li>`).join('');
+      <span class="val">${fmtPct(km)}, ${fmtKm(km)}</span></button></li>`).join('');
+  listEl.onclick = (e) => {
+    const b = e.target.closest('button[data-key]');
+    if (b) onToggle(b.dataset.key);
+  };
 }
 
 const SCORE_LABELS = { distance: 'Distanz passt', surface: 'Belag passt', overlap: 'Wenig doppelt', direction: 'Startrichtung' };

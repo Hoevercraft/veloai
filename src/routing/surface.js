@@ -1,3 +1,5 @@
+import { distKm } from '../core/geo.js';
+
 // Belag-Analyse auf Basis der BRouter-Segmentdaten (properties.messages).
 // Erste Zeile = Spaltennamen, danach pro Segment u. a. Longitude/Latitude
 // (Mikrograd, Segment-Ende), Distance (m) und WayTags ("highway=track surface=gravel …").
@@ -174,6 +176,33 @@ export function surfaceKeyMap(rows, coords) {
   const map = new Map();
   for (let i = 0; i < n; i++) map.set(ckey(coords[i]), { key: keyAt[i] ?? lastKey, level: keyAt[i] ? lvlAt[i] : lastLvl });
   return map;
+}
+
+/**
+ * Belag-Abschnitte der (bereinigten) Route mit Länge und Mittelpunkt.
+ * Grundlage für Anzeige und Markierung, damit Liste und Karte immer
+ * dieselben Abschnitte zeigen – auch einzelne Punkte (Länge 0) zählen.
+ * → [{ key, from, to, km, mid:[lon,lat] }]
+ */
+export function surfacePieces(coords, segs) {
+  return segs.map((s) => {
+    let km = 0;
+    for (let i = s.from + 1; i <= s.to; i++) km += distKm(coords[i - 1], coords[i]);
+    // Mittelpunkt entlang der Strecke, damit der Marker auf dem Abschnitt liegt
+    let mid = coords[s.from], acc = 0;
+    for (let i = s.from + 1; i <= s.to; i++) {
+      acc += distKm(coords[i - 1], coords[i]);
+      if (acc >= km / 2) { mid = coords[i]; break; }
+    }
+    return { key: s.key, from: s.from, to: s.to, km, mid: [mid[0], mid[1]] };
+  });
+}
+
+/** km je Belag aus den Abschnitten. */
+export function breakdownFromPieces(pieces) {
+  const out = {};
+  for (const p of pieces) out[p.key] = (out[p.key] || 0) + p.km;
+  return out;
 }
 
 /** Zeichen-Segmente (Lauflängen) aus Geometrie + keyMap. */
