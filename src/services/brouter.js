@@ -56,13 +56,34 @@ export function createBrouter({ base = BASE, timeoutMs = 30000 } = {}) {
         try { pid = await uploadProfile(bike); } catch { pid = FALLBACK_PROFILE[bike]; custom = false; }
         continue;
       }
-      if (/not mapped|position/i.test(msg)) throw new Error('Ein Wegpunkt liegt außerhalb des Wegenetzes.');
+      // Wegpunkt unerreichbar (Insel im erlaubten Wegenetz oder abseits jeder Straße):
+      // Index des betroffenen Punkts mitgeben, damit der Planer ihn weglassen kann.
+      const unreachable = unreachablePointIndex(msg);
+      if (unreachable != null) {
+        const err = new Error('Ein Wegpunkt ist mit diesem Fahrradtyp nicht erreichbar.');
+        err.pointIndex = unreachable;
+        throw err;
+      }
       throw new Error('Routing fehlgeschlagen: ' + msg);
     }
     throw new Error('Routing fehlgeschlagen.');
   }
 
   return { name: 'brouter', route };
+}
+
+/**
+ * BRouter-Fehlertext → Index des unerreichbaren Punkts in `points`, sonst null.
+ * Abschnitt N verbindet points[N] und points[N+1].
+ *  "target island detected for section N"  → points[N+1]
+ *  "start island detected for section N"   → points[N]
+ *  "from-position not mapped …" / "to-position not mapped …" (ohne Abschnitt) → unbekannt (-1)
+ */
+export function unreachablePointIndex(msg) {
+  const m = /(target|start) island detected for section (\d+)/i.exec(msg);
+  if (m) return m[1].toLowerCase() === 'target' ? +m[2] + 1 : +m[2];
+  if (/position not mapped|not mapped in existing datafile/i.test(msg)) return -1;
+  return null;
 }
 
 function toRoute(f) {

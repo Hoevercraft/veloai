@@ -7,6 +7,7 @@ import { distanceScore, surfaceScore, overlapShare, directionScore, scoreRoute }
 import { removeBacktracks } from '../../src/routing/backtrack.js';
 import { planRoundTrip } from '../../src/routing/planner.js';
 import { PROFILES } from '../../src/routing/profiles.js';
+import { unreachablePointIndex } from '../../src/services/brouter.js';
 import { createMockRouting, createMockPois } from '../../src/services/mock.js';
 
 const START = [9.732, 52.376];
@@ -104,6 +105,50 @@ test('Rennrad-Profil sperrt unbefestigte Wege statt sie nur teurer zu machen', (
   assert.match(road, /highway=track then \( if pavedtrack then 2\.5 else 100000 \)/);
   assert.match(road, /highway=path then \( if ispaved then 2 else 100000 \)/);
   assert.doesNotMatch(road, /else 60/);
+});
+
+test('unreachablePointIndex liest BRouter-Fehler richtig', () => {
+  assert.equal(unreachablePointIndex('target island detected for section 3\n'), 4);
+  assert.equal(unreachablePointIndex('start island detected for section 2'), 2);
+  assert.equal(unreachablePointIndex('to-position not mapped in existing datafile'), -1);
+  assert.equal(unreachablePointIndex('some other error'), null);
+});
+
+test('Planer: unerreichbarer Wegpunkt wird weggelassen statt den Kandidaten zu verlieren', async () => {
+  let calls = 0, islandHits = 0;
+  const islandRouting = {
+    async route(points, bike) {
+      calls++;
+      // jeder Wegpunkt östlich von 9.80 liegt auf einer "Insel"
+      const i = points.findIndex((p, k) => k > 0 && k < points.length - 1 && p[0] > 9.80);
+      if (i > 0) {
+        islandHits++;
+        const e = new Error('Ein Wegpunkt ist mit diesem Fahrradtyp nicht erreichbar.');
+        e.pointIndex = i;
+        throw e;
+      }
+      return mockServices.routing.route(points, bike);
+    },
+  };
+  const res = await planRoundTrip({ start: START, distKm: 40, bike: 'road', heading: 90, seed: 3 },
+    { routing: islandRouting, pois: mockServices.pois });
+  assert.ok(islandHits > 0, 'Testaufbau: es sollte Insel-Treffer geben');
+  assert.ok(res.routes.length >= 1);
+  for (const r of res.routes) assert.ok(r.waypoints.every((p) => p[0] <= 9.80));
+});
+
+test('Planer: unerreichbares Zwischenziel wird nicht still entfernt', async () => {
+  const via = [9.95, 52.40];
+  const routing = {
+    async route(points) {
+      const i = points.findIndex((p) => p === via);
+      const e = new Error('Ein Wegpunkt ist mit diesem Fahrradtyp nicht erreichbar.');
+      e.pointIndex = i;
+      throw e;
+    },
+  };
+  await assert.rejects(planRoundTrip({ start: START, distKm: 40, bike: 'road', vias: [via], seed: 1 },
+    { routing, pois: mockServices.pois }), /nicht erreichbar/);
 });
 
 test('distanceScore ist bei Treffer maximal', () => {
