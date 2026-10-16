@@ -56,6 +56,7 @@ src/routing/scoring.js   Bewertung: Distanz, Belag, Doppelbefahrung, Startrichtu
 src/routing/planner.js   Ablauf: Pool laden → Kandidaten parallel routen → bewerten → nachschärfen
 src/routing/surface.js   Belag aus BRouter-Segmenten, Warnungen, Farben
 src/routing/backtrack.js entfernt Hin-und-zurück-Stiche
+src/routing/detours.js   erkennt Abstecher, die Wegpunkte erzwingen, und versetzt die Wegpunkte
 src/services/            brouter, overpass, geocode (Photon/Nominatim), mock
 tests/unit/              node:test
 tests/e2e/smoke.mjs      Playwright-Ablauf mit ?mock=1
@@ -68,6 +69,13 @@ Statt einer einzigen Runde mit Distanz-Wiederholungen werden **6 Kandidaten para
 geroutet. Jede Route wird bereinigt und bewertet (Gewichte je Radtyp in `scoring.js`).
 Die zwei besten werden bei Bedarf mit korrigiertem Radius erneut gerechnet. Ergebnis: beste Route
 plus bis zu 4 unterschiedliche Alternativen zum Durchblättern, ohne neue Serveranfragen.
+
+**Abstecher-Korrektur** (`detours.js`): Liegt ein Wegpunkt auf einem Neben- oder Stichweg und erzwingt
+dadurch einen Umweg (Weg A→W→B > 1,6 × Luftlinie A–B), wird er auf die Abzweigstelle der durchgehenden
+Straße gesetzt und neu gerechnet. Restliche Abstecher fließen als Kriterium „detour“ in die Bewertung ein.
+
+**Umwegfaktor** `DETOUR` in `loopgen.js` ist live gemessen (`tools/calibrate-detour.mjs`).
+Werkzeuge zum Nachmessen: `tools/detour-survey.mjs`, `tools/compare-planner.mjs`, `tools/compare-versions.mjs`.
 
 Kompass = **Startrichtung**: Das Layout wird so gedreht, dass die Runde grob in diese Richtung losfährt.
 Die Richtung fließt mit 12 % Gewicht in die Bewertung ein, die Route bleibt sonst frei.
