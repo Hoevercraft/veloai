@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { distKm, bearing, angleDiff, lineKm } from '../../src/core/geo.js';
-import { generateLayouts, waypointCount, mergeVias, minLoopKmThroughVias } from '../../src/routing/loopgen.js';
+import { generateLayouts, waypointCount, mergeVias, minLoopKmThroughVias, DETOUR } from '../../src/routing/loopgen.js';
 import { analyzeSurface, parseMessages, pavedClass, surfacePieces, breakdownFromPieces } from '../../src/routing/surface.js';
 import { distanceScore, surfaceScore, overlapShare, directionScore, scoreRoute } from '../../src/routing/scoring.js';
 import { removeBacktracks } from '../../src/routing/backtrack.js';
@@ -31,7 +31,7 @@ test('Layouts: erster Wegpunkt zeigt ungefähr in die Kompassrichtung', () => {
 test('Layouts: Polygonumfang × Umwegfaktor liegt nahe an der Zieldistanz', () => {
   const ls = generateLayouts({ start: START, distKm: 80, bike: 'road', seed: 3, count: 6 });
   for (const l of ls) {
-    const km = lineKm([START, ...l.generated, START]) * 1.25;
+    const km = lineKm([START, ...l.generated, START]) * DETOUR.road;
     assert.ok(km > 80 * 0.85 && km < 80 * 1.15, `war ${km.toFixed(1)} km`);
   }
 });

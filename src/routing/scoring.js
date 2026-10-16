@@ -5,9 +5,9 @@ import { distKm, bearing, angleDiff, pointAtKm } from '../core/geo.js';
 // bei Hardcore zählt der Belag am meisten, beim Rennrad Belag und Distanz gleich.
 
 export const WEIGHTS = {
-  road: { distance: 0.35, surface: 0.35, overlap: 0.2, direction: 0.12 },
-  gravel: { distance: 0.35, surface: 0.3, overlap: 0.25, direction: 0.12 },
-  hardcore: { distance: 0.25, surface: 0.45, overlap: 0.2, direction: 0.12 },
+  road: { distance: 0.35, surface: 0.35, overlap: 0.2, direction: 0.12, detour: 0.25 },
+  gravel: { distance: 0.35, surface: 0.3, overlap: 0.25, direction: 0.12, detour: 0.2 },
+  hardcore: { distance: 0.25, surface: 0.45, overlap: 0.2, direction: 0.12, detour: 0.15 },
 };
 
 /** Distanztreue: 0 % Abweichung → 1, 12 % → 0,37, 25 % → ~0,01 */
@@ -79,12 +79,18 @@ export function directionScore(coords, totalKm, heading) {
   return (1 + Math.cos(diff * Math.PI / 180)) / 2; // 0° → 1, 90° → 0,5, 180° → 0
 }
 
+/** Abstecher von der durchgehenden Straße: 0 km → 1, 1 km → 0,37, 3 km → 0,05 */
+export function detourScore(detourKm) {
+  if (detourKm == null) return null;
+  return Math.exp(-detourKm);
+}
+
 /**
  * Gesamtbewertung. Liefert { total, parts } mit Teilwerten 0–1.
  * Ohne Kompassrichtung fällt das Richtungskriterium weg und die übrigen
- * Gewichte werden hochskaliert.
+ * Gewichte werden hochskaliert. Ohne Abstecher-Analyse (detourKm = null) ebenso.
  */
-export function scoreRoute({ coords, actualKm, targetKm, surface, bike, heading }) {
+export function scoreRoute({ coords, actualKm, targetKm, surface, bike, heading, detourKm = null }) {
   const w = WEIGHTS[bike] || WEIGHTS.gravel;
   const ov = overlapShare(coords);
   const parts = {
@@ -92,6 +98,7 @@ export function scoreRoute({ coords, actualKm, targetKm, surface, bike, heading 
     surface: surfaceScore(surface, bike),
     overlap: overlapScore(ov),
     direction: directionScore(coords, actualKm, heading),
+    detour: detourScore(detourKm),
   };
   let sum = 0, wsum = 0;
   for (const k of Object.keys(w)) {

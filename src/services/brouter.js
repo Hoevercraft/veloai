@@ -36,6 +36,7 @@ export function createBrouter({ base = BASE, timeoutMs = 30000 } = {}) {
       pid = FALLBACK_PROFILE[bike]; custom = false;
     }
     const lonlats = points.map((p) => p[0].toFixed(6) + ',' + p[1].toFixed(6)).join('|');
+    let busyRetries = 0;
 
     for (let attempt = 0; attempt < 2; attempt++) {
       let res, text;
@@ -50,6 +51,13 @@ export function createBrouter({ base = BASE, timeoutMs = 30000 } = {}) {
       if (res.ok && data?.features?.length) return toRoute(data.features[0]);
 
       const msg = data?.error || data?.message || text.replace(/<[^>]*>/g, ' ').trim().slice(0, 180) || 'HTTP ' + res.status;
+      // Server kurz überlastet ("Please, retry later!" bzw. 503/429): bis zu zweimal mit Pause wiederholen
+      if ((/retry later/i.test(msg) || res.status === 503 || res.status === 429) && busyRetries < 2) {
+        busyRetries++;
+        await new Promise((r) => setTimeout(r, 1200 * busyRetries + Math.random() * 800));
+        attempt--; // zählt nicht als Profil-Versuch
+        continue;
+      }
       if (custom && attempt === 0 && /profil/i.test(msg)) {
         // Profil auf dem Server abgelaufen → neu hochladen
         delete profileIds[bike];

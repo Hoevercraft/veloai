@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from './http.js';
+import { distKm } from '../core/geo.js';
 
 // Wegpunkt-Kandidaten aus OpenStreetMap (Overpass API).
 // Liefert pro Fahrradtyp einen Pool [{ coord:[lon,lat], q:0..1 }] –
@@ -8,6 +9,52 @@ import { fetchWithTimeout } from './http.js';
 const MIRRORS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 const UNPAVED = /^(unpaved|gravel|fine_gravel|compacted|ground|dirt|earth|sand|grass|pebblestone|mud)$/;
 const PAVED = /^(asphalt|paved|concrete|paving_stones|sett|cobblestone)$/;
+
+const MIN_WAY_KM = { road: 0.3, gravel: 0.15, hardcore: 0.15 }; // kürzere Wege = Stichstraßen/Zufahrten
+const SAMPLE_KM = 0.25; // Abstand der Kandidatenpunkte entlang eines Wegs
+const MAX_SAMPLES = 8;
+
+function wayKm(geom) {
+  let d = 0;
+  for (let i = 1; i < geom.length; i++) d += distKm(geom[i - 1], geom[i]);
+  return d;
+}
+
+/**
+ * Overpass-Elemente (mit "out geom") → Kandidatenpunkte, die AUF dem Weg liegen.
+ * Früher wurde der Mittelpunkt ("out center") genommen – bei kurvigen Straßen liegt
+ * der im Feld, BRouter rastet ihn dann auf irgendeinen Nebenweg ein.
+ * Lange, durchgehende Wege werden bevorzugt, kurze Stichwege fallen weg.
+ * Flächen (Wald, Park) liefern ihren Mittelpunkt.
+ */
+export function candidatesFromElements(elements, bike, hot, rate) {
+  const out = [];
+  for (const e of elements) {
+    const q0 = rate(e, bike, hot);
+    if (q0 <= 0.05) continue;
+    const geom = (e.geometry || []).filter((g) => g && g.lon != null).map((g) => [g.lon, g.lat]);
+    if (!e.tags?.highway) {
+      // Fläche: Schwerpunkt der Umrisspunkte (bzw. center/lat-lon, falls vorhanden)
+      const c = e.center ? [e.center.lon, e.center.lat]
+        : e.lon != null ? [e.lon, e.lat]
+          : geom.length ? [geom.reduce((s, p) => s + p[0], 0) / geom.length, geom.reduce((s, p) => s + p[1], 0) / geom.length] : null;
+      if (c) out.push({ coord: c, q: q0 });
+      continue;
+    }
+    if (geom.length < 2) continue;
+    const km = wayKm(geom);
+    if (km < (MIN_WAY_KM[bike] ?? 0.15)) continue;
+    const q = q0 * Math.min(1, 0.6 + km / 2.5); // ab ~1 km volle Punktzahl
+    // Punkte im Abstand SAMPLE_KM entlang des Wegs, Endpunkte (Kreuzungen) ausgelassen
+    const step = Math.max(SAMPLE_KM, km / (MAX_SAMPLES + 1));
+    let acc = 0, next = step / 2;
+    for (let i = 1; i < geom.length - 1 && out.length < 50000; i++) {
+      acc += distKm(geom[i - 1], geom[i]);
+      if (acc >= next) { out.push({ coord: geom[i], q }); next += step; }
+    }
+  }
+  return out;
+}
 
 export function createOverpass({ mirrors = MIRRORS, timeoutMs = 20000 } = {}) {
   const cache = new Map();
@@ -28,7 +75,6 @@ export function createOverpass({ mirrors = MIRRORS, timeoutMs = 20000 } = {}) {
     throw lastErr || new Error('Overpass nicht erreichbar');
   }
 
-  const centerOf = (e) => (e.center ? [e.center.lon, e.center.lat] : e.lon != null ? [e.lon, e.lat] : null);
 
   function rate(e, bike, hot) {
     const t = e.tags || {};
@@ -68,10 +114,8 @@ export function createOverpass({ mirrors = MIRRORS, timeoutMs = 20000 } = {}) {
         way["highway"~"^(path|bridleway)$"]["bicycle"!="no"]["surface"!~"^(asphalt|paved|concrete)$"]${around};`;
       if (hot) body += `way["landuse"="forest"]${around};way["natural"="wood"]${around};`;
     }
-    const d = await query(`[out:json][timeout:25];(${body});out center qt 600;`);
-    return (d.elements || [])
-      .map((e) => ({ coord: centerOf(e), q: rate(e, bike, hot) }))
-      .filter((c) => c.coord && c.q > 0.05);
+    const d = await query(`[out:json][timeout:25];(${body});out geom qt 600;`);
+    return candidatesFromElements(d.elements || [], bike, hot, rate);
   }
 
   return { name: 'overpass', candidates };

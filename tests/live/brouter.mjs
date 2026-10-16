@@ -19,7 +19,8 @@ for (const bike of Object.keys(PROFILES)) {
   await step(`Profil „${bike}“ wird von BRouter akzeptiert`, async () => {
     const r = await fetch('https://brouter.de/brouter/profile', { method: 'POST', body: PROFILES[bike] });
     const d = await r.json();
-    assert.ok(d.profileid, `Antwort: ${JSON.stringify(d).slice(0, 300)}`);
+    // BRouter liefert bei Syntaxfehlern trotzdem eine ID – deshalb auch auf "error" prüfen
+    assert.ok(d.profileid && !d.error, `Antwort: ${JSON.stringify(d).slice(0, 300)}`);
   });
 }
 
@@ -51,6 +52,8 @@ for (const bike of ['road', 'gravel', 'hardcore']) {
     assert.ok(res.routes.length >= 2, `nur ${res.routes.length} Variante(n)`);
     const best = res.routes[0];
     assert.ok(Math.abs(best.actualKm - 50) / 50 < 0.2, `beste Route ${best.actualKm.toFixed(1)} km`);
+    // Beste Route darf höchstens ~0,5 km erzwungene Abstecher haben (detour-Teilwert >= 0,6)
+    assert.ok(best.score.parts.detour == null || best.score.parts.detour >= 0.6, `Abstecher-Wert ${best.score.parts.detour?.toFixed(2)}`);
     if (bike === 'road') {
       for (const r of res.routes) assert.ok(r.surface.unpavedShare === 0, `Rennrad-Variante mit ${(r.surface.unpavedShare * 100).toFixed(1)} % unbefestigt`);
     }

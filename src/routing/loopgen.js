@@ -10,7 +10,8 @@ import { distKm, bearing, angleDiff, destination, seededRandom } from '../core/g
 // gewünschte Startrichtung (Kompass) losfährt – oder zufällig, wenn keine gewählt ist.
 
 /** Umwegfaktor: echte Wegstrecke / Luftlinien-Polygon. */
-export const DETOUR = { road: 1.25, gravel: 1.33, hardcore: 1.4 };
+// Live gemessen (tools/calibrate-detour.mjs, 4 Startorte Niedersachsen, je 6 Layouts, Okt. 2026)
+export const DETOUR = { road: 1.2, gravel: 1.22, hardcore: 1.5 };
 
 /** Wegpunktzahl skaliert mit der Distanz: 30 → 3 · 70 → 4 · 120 → 6 · 180 → 8 */
 export function waypointCount(km) {

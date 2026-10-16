@@ -70,7 +70,7 @@ ${ONEWAY_AND_ACCESS(8)}
 assign basecost =
   if highway= then 100000
   else if highway=motorway|motorway_link|trunk|trunk_link then 100000
-  else if highway=steps|construction then 100000
+  else if highway=steps|construction|proposed|abandoned|platform|raceway|corridor then 100000
   else if isunpaved then 100000
   else if highway=bridleway then 100000
   else if highway=footway|pedestrian then ( if ispaved then 40 else 100000 )
@@ -103,7 +103,7 @@ ${ONEWAY_AND_ACCESS(5)}
 assign basecost =
   if highway= then 100000
   else if highway=motorway|motorway_link|trunk|trunk_link then 100000
-  else if highway=steps|construction then 100000
+  else if highway=steps|construction|proposed|abandoned|platform|raceway|corridor then 100000
   else if highway=primary|primary_link then 5
   else if highway=secondary|secondary_link then 2.8
   else if highway=track then ( if tracktype=grade5 then 1.6 else 1 )
@@ -139,7 +139,7 @@ ${ONEWAY_AND_ACCESS(4)}
 assign basecost =
   if highway= then 100000
   else if highway=motorway|motorway_link|trunk|trunk_link then 100000
-  else if highway=steps|construction then 100000
+  else if highway=steps|construction|proposed|abandoned|platform|raceway|corridor then 100000
   else if highway=primary|primary_link then 400
   else if highway=secondary|secondary_link then 120
   else if highway=tertiary|tertiary_link then ( if isunpaved then 3 else 40 )

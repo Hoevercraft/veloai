@@ -4,6 +4,7 @@ import { parseMessages, analyzeSurface, surfaceKeyMap, surfaceSegments, surfaceP
 import { removeBacktracks } from './backtrack.js';
 import { scoreRoute } from './scoring.js';
 import { mapLimit } from '../services/http.js';
+import { tagsPerCoord, findDetourFixes } from './detours.js';
 
 // Rundkurs-Planer: mehrere Kandidaten parallel erzeugen, bewerten, bester gewinnt.
 //
@@ -16,10 +17,11 @@ import { mapLimit } from '../services/http.js';
 
 export const PLANNER_DEFAULTS = {
   firstRound: 6,
-  refineTop: 2,
+  refineTop: 3,
   concurrency: 3,
   maxAlternatives: 5,
   similarity: 0.8,
+  fixDetours: true,
 };
 
 /** Höhenmeter aus der Geometrie, mit 3-m-Hysterese gegen Messrauschen. */
@@ -105,10 +107,31 @@ export async function planRoundTrip(params, services, onProgress = () => {}, opt
     }
   };
 
+  // Route rechnen; erzwingen Wegpunkte Abstecher von der durchgehenden Straße,
+  // werden sie auf die Abzweigstelle gesetzt und es wird einmal neu gerechnet.
+  // Die bessere der beiden Routen gewinnt.
   const evaluate = async (layout, waypoints) => {
-    const routed = await routeDroppingUnreachable(waypoints);
-    const raw = routed.raw;
-    waypoints = routed.wps;
+    const first = await routeDroppingUnreachable(waypoints);
+    const firstFixes = o.fixDetours ? detourFixesOf(first) : [];
+    const firstResult = analyze(layout, first.raw, first.wps, o.fixDetours ? sumKm(firstFixes) : null);
+    if (!firstFixes.length) return firstResult;
+    const moved = first.wps.map((p, i) => firstFixes.find((f) => f.index === i)?.to ?? p);
+    try {
+      const second = await routeDroppingUnreachable(moved);
+      const secondResult = analyze(layout, second.raw, second.wps, sumKm(detourFixesOf(second)));
+      secondResult.detoursFixed = firstFixes.length;
+      return secondResult.score.total >= firstResult.score.total ? secondResult : firstResult;
+    } catch {
+      return firstResult;
+    }
+  };
+
+  const detourFixesOf = ({ raw, wps }) => findDetourFixes({
+    coords: raw.coords, tags: tagsPerCoord(parseMessages(raw.messages), raw.coords), waypoints: wps, bike, protect: vias,
+  });
+  const sumKm = (fixes) => fixes.reduce((s, f) => s + f.detourKm, 0);
+
+  const analyze = (layout, raw, waypoints, detourKm = null) => {
     const rows = parseMessages(raw.messages);
     const keyMap = surfaceKeyMap(rows, raw.coords);
     const coords = removeBacktracks(raw.coords, vias, target);
@@ -116,7 +139,7 @@ export async function planRoundTrip(params, services, onProgress = () => {}, opt
     const surface = analyzeSurface(rows, bike);
     const { segs, riskSegs } = surfaceSegments(coords, keyMap);
     const pieces = surfacePieces(coords, segs);
-    const score = scoreRoute({ coords, actualKm, targetKm: target, surface, bike, heading });
+    const score = scoreRoute({ coords, actualKm, targetKm: target, surface, bike, heading, detourKm });
     return {
       id: layout.id,
       layout,
