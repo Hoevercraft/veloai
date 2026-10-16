@@ -24,6 +24,11 @@ npm run test:all       # beides
 npm run test:live      # gegen echtes brouter.de (braucht Internet, läuft in GitHub Actions)
 ```
 
+In der Claude-Cloud-Umgebung läuft Node nur mit Proxy-Einstellung ins Netz:
+`NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt npm run test:live`.
+Overpass antwortet von dort meist mit 429 (geteilte Cloud-IP) – der Planer fällt dann auf geometrische
+Wegpunkte zurück, das ist erwartet.
+
 Rennrad-Profil: unbefestigte Wege sind **gesperrt** (100000), nicht nur teuer. Sonst rasten Wegpunkte
 auf Waldwegen ein und erzwingen Abstecher. Der Live-Test prüft echte Strecken auf unbefestigte Meter.
 

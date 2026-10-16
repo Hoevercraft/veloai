@@ -76,9 +76,39 @@ export async function planRoundTrip(params, services, onProgress = () => {}, opt
     notes.push('Wegsuche (Overpass) nicht erreichbar – Wegpunkte werden geometrisch gesetzt.');
   }
 
+  const isVia = (p) => vias.some((v) => v === p);
+
+  // Unerreichbare generierte Wegpunkte (z. B. Asphalt-Insel inmitten gesperrter
+  // Schotterwege) weglassen und neu rechnen – bis zu zweimal. Zwischenziele bleiben.
+  const routeDroppingUnreachable = async (waypoints) => {
+    let wps = waypoints;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return { raw: await services.routing.route([start, ...wps, start], bike), wps };
+      } catch (e) {
+        const idx = e.pointIndex;
+        if (idx == null || attempt >= 2) throw e;
+        const wpIdx = idx - 1; // points[0] ist der Start
+        if (wpIdx >= 0 && wpIdx < wps.length && !isVia(wps[wpIdx])) {
+          wps = wps.filter((_, i) => i !== wpIdx);
+        } else if (idx === -1) {
+          // Punkt unbekannt: generierten Wegpunkt mit dem größten Abstand zum Start weglassen
+          const cand = wps.map((p, i) => [i, distKm(start, p)]).filter(([i]) => !isVia(wps[i]));
+          if (!cand.length) throw e;
+          const [drop] = cand.sort((a, b) => b[1] - a[1])[0];
+          wps = wps.filter((_, i) => i !== drop);
+        } else {
+          throw e; // Start oder Zwischenziel nicht erreichbar → nicht still verändern
+        }
+        if (wps.length < 1) throw e;
+      }
+    }
+  };
+
   const evaluate = async (layout, waypoints) => {
-    const points = [start, ...waypoints, start];
-    const raw = await services.routing.route(points, bike);
+    const routed = await routeDroppingUnreachable(waypoints);
+    const raw = routed.raw;
+    waypoints = routed.wps;
     const rows = parseMessages(raw.messages);
     const keyMap = surfaceKeyMap(rows, raw.coords);
     const coords = removeBacktracks(raw.coords, vias, target);
